@@ -86,7 +86,10 @@ fi
 # This ensures we catch any misconfigured ports, not just common ones
 # -Pn skips host discovery to work with hosts that block ping
 # Note: This will be slower than scanning just top ports but more thorough
+START_TIME=$(date +%s)
 SCAN_RESULTS=$(nmap -Pn -p- "$HOST" 2>&1)
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
 
 if [[ $? -ne 0 ]]; then
     echo "Error: nmap scan failed" >&2
@@ -97,7 +100,12 @@ fi
 # Send results via apprise to ntfy
 # Title includes the hostname for easy identification
 # Body contains the full nmap output to show which ports are open
-apprise --title "Port Scan: $HOST" --body "$SCAN_RESULTS" "ntfys://$NTFY"
+# Duration is included to help understand scan performance
+NOTIFICATION_BODY="Scan duration: ${DURATION} seconds
+
+$SCAN_RESULTS"
+
+apprise --title "Port Scan: $HOST" --body "$NOTIFICATION_BODY" "ntfys://$NTFY"
 
 if [[ $? -ne 0 ]]; then
     echo "Error: Failed to send notification via apprise" >&2
