@@ -82,10 +82,11 @@ if [[ -z "$NTFY" ]]; then
 fi
 
 # Run nmap scan
-# Using --top-ports 1000 for a balance between speed and coverage
-# This scans the most common 1000 ports which should catch most misconfigurations
+# Using -p- to scan all 65535 TCP ports for comprehensive coverage
+# This ensures we catch any misconfigured ports, not just common ones
 # -Pn skips host discovery to work with hosts that block ping
-SCAN_RESULTS=$(nmap -Pn --top-ports 1000 "$HOST" 2>&1)
+# Note: This will be slower than scanning just top ports but more thorough
+SCAN_RESULTS=$(nmap -Pn -p- "$HOST" 2>&1)
 
 if [[ $? -ne 0 ]]; then
     echo "Error: nmap scan failed" >&2
