@@ -12,14 +12,14 @@ show_help() {
     cat << EOF
 ntfy_nmap_watcher.sh v${VERSION}
 
-Usage: $0 --host <hostname|ip> --ntfy <ntfy_topic> [-h|--help]
+Usage: $0 --host <hostname|ip> [--ntfy <ntfy_topic>] [-h|--help]
 
-Monitor open ports on a host using nmap and send results via ntfy.
+Monitor open ports on a host using nmap and optionally send results via ntfy.
 Designed to detect ufw misconfiguration by showing externally visible ports.
 
 Arguments:
   --host <hostname|ip>  Target host to scan (required)
-  --ntfy <ntfy_topic>   Ntfy topic for notifications (required)
+  --ntfy <ntfy_topic>   Ntfy topic for notifications (optional)
   -h, --help           Show this help message and version
 
 Example:
@@ -37,11 +37,6 @@ if ! command -v nmap &> /dev/null; then
     exit 1
 fi
 
-# apprise is required to send notifications via ntfy
-if ! command -v apprise &> /dev/null; then
-    echo "Error: apprise is not installed or not in PATH" >&2
-    exit 1
-fi
 
 # Parse command line arguments
 HOST=""
@@ -75,9 +70,11 @@ if [[ -z "$HOST" ]]; then
     exit 1
 fi
 
-if [[ -z "$NTFY" ]]; then
-    echo "Error: --ntfy argument is required" >&2
-    echo "Use --help for usage information" >&2
+# If --ntfy is specified, check that apprise is available
+# Otherwise we'll just print results to stdout
+if [[ -n "$NTFY" ]] && ! command -v apprise &> /dev/null; then
+    echo "Error: apprise is not installed or not in PATH" >&2
+    echo "apprise is required when using --ntfy option" >&2
     exit 1
 fi
 
@@ -97,19 +94,29 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# Send results via apprise to ntfy
-# Title includes the hostname for easy identification
-# Body contains the full nmap output to show which ports are open
-# Duration is included to help understand scan performance
-NOTIFICATION_BODY="Scan duration: ${DURATION} seconds
+# If --ntfy was provided, send notification via apprise
+# Otherwise, just print the results to stdout
+if [[ -n "$NTFY" ]]; then
+    # Send results via apprise to ntfy
+    # Title includes the hostname for easy identification
+    # Body contains the full nmap output to show which ports are open
+    # Duration is included to help understand scan performance
+    NOTIFICATION_BODY="Scan duration: ${DURATION} seconds
 
 $SCAN_RESULTS"
 
-apprise --title "Port Scan: $HOST" --body "$NOTIFICATION_BODY" "ntfys://$NTFY"
+    apprise --title "Port Scan: $HOST" --body "$NOTIFICATION_BODY" "ntfys://$NTFY"
 
-if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to send notification via apprise" >&2
-    exit 1
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Failed to send notification via apprise" >&2
+        exit 1
+    fi
+
+    echo "Scan completed and notification sent successfully"
+else
+    # Print results to stdout when no ntfy topic is specified
+    echo "Port Scan: $HOST"
+    echo "Scan duration: ${DURATION} seconds"
+    echo ""
+    echo "$SCAN_RESULTS"
 fi
-
-echo "Scan completed and notification sent successfully"
